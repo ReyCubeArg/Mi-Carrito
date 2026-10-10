@@ -42,7 +42,7 @@ function btn(text,parent,fn){
 
 function productPage(){
  const name=params.get("name")||"Cubo Rey Cube";
- const price=Number(params.get("price"));
+const price = Number(new URLSearchParams(window.location.search).get("price") || 0);
  app.replaceChildren();
  node("h3",name,app);
  if(price>0)node("p",money(price)+" ARS",app);

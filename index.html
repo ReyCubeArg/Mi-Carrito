@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:Arial,sans-serif;margin:0;color:#17202a}
+main{padding:16px;border:1px solid #ddd;border-radius:12px}
+button,a{display:inline-block;box-sizing:border-box;border:0;
+border-radius:7px;padding:12px;background:#1689b5;color:white;
+text-decoration:none;cursor:pointer;font-size:15px}
+input{width:45px;padding:7px}
+.item{padding:12px 0;border-bottom:1px solid #ddd}
+.muted{color:#666;font-size:14px}
+</style>
+</head>
+<body>
+<main id="app">Cargando Rey Cube...</main>
+<script>
+const CART_KEY = "reycube_cart_v1";
+
+// CAMBIAR ESTAS DOS DIRECCIONES:
+const CART_PAGE_URL = "PEGÁ_ACÁ_LA_URL_DE_TU_PÁGINA_MI_CARRITO";
+const INSTAGRAM_URL = "https://www.instagram.com/reycubearg/";
+
+const params = new URLSearchParams(location.search);
+const app = document.getElementById("app");
+const money = n => "$" + n.toLocaleString("es-AR");
+
+function getCart(){
+  try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; }
+  catch(e) { return []; }
+}
+function saveCart(cart){
+  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+}
+function el(tag, text, parent){
+  const node = document.createElement(tag);
+  node.textContent = text;
+  if(parent) parent.appendChild(node);
+  return node;
+}
+function button(text, parent, action){
+  const b = el("button",text,parent);
+  b.style.margin = "4px";
+  b.onclick = action;
+  return b;
+}
+
+function showProduct(){
+  const name = params.get("name") || "Cubo Rey Cube";
+  const price = Number(params.get("price"));
+  app.replaceChildren();
+  el("h3",name,app);
+  el("p",Number.isFinite(price) && price > 0
+    ? money(price) + " ARS" : "Precio a consultar",app);
+
+  button("＋ Agregar al carrito",app,()=>{
+    if(!Number.isFinite(price) || price <= 0){
+      alert("Revisá el precio de este producto.");
+      return;
+    }
+    const cart = getCart();
+    const item = cart.find(p=>p.name===name);
+    if(item) item.qty++;
+    else cart.push({name,price,qty:1});
+    saveCart(cart);
+    app.replaceChildren();
+    el("p","¡Producto agregado al carrito!",app);
+    const a = el("a","Ir a Mi carrito",app);
+    a.href = CART_PAGE_URL;
+    a.target = "_top";
+  });
+}
+
+function showCart(){
+  app.replaceChildren();
+  el("h2","🛒 Mi carrito",app);
+  const cart = getCart();
+  if(!cart.length){
+    el("p","Todavía no agregaste productos.",app);
+  }
+  let total = 0;
+
+  cart.forEach((p,i)=>{
+    const row = el("div","",app);
+    row.className = "item";
+    el("b",p.name,row);
+    el("p",money(p.price)+" ARS por unidad",row);
+    const controls = el("div","",row);
+    button("−",controls,()=>{
+      p.qty--;
+      if(p.qty<=0) cart.splice(i,1);
+      saveCart(cart); showCart();
+    });
+    el("span","  "+p.qty+"  ",controls);
+    button("+",controls,()=>{
+      p.qty++;
+      saveCart(cart); showCart();
+    });
+    button("Eliminar",controls,()=>{
+      cart.splice(i,1);
+      saveCart(cart); showCart();
+    });
+    total += p.price*p.qty;
+    el("p","Subtotal: "+money(p.price*p.qty),row);
+  });
+
+  el("h3","Total: "+money(total)+" ARS",app);
+
+  if(cart.length){
+    button("Pedir por Instagram",app,()=>{
+      const message = "¡Hola, Rey Cube! Quiero hacer este pedido:\n\n"+
+        cart.map(p=>"- "+p.name+" x"+p.qty+" = "+
+        money(p.price*p.qty)+" ARS").join("\n")+
+        "\n\nTotal de productos: "+money(total)+
+        " ARS\n¿Me confirman el stock y el envío?";
+      app.querySelectorAll(".order-output").forEach(n=>n.remove());
+      const box = el("div","",app);
+      box.className="order-output";
+      el("p","Copiá este pedido y pegalo en Instagram:",box);
+      const area=el("textarea","",box);
+      area.value=message;
+      area.rows=8;
+      area.style.cssText="width:100%;box-sizing:border-box";
+      button("Copiar pedido",box,async()=>{
+        try{
+          await navigator.clipboard.writeText(message);
+          alert("Pedido copiado.");
+        }catch(e){
+          area.select();
+          alert("Copiá el texto seleccionado.");
+        }
+      });
+      const a=el("a","Abrir Instagram",box);
+      a.href=INSTAGRAM_URL;
+      a.target="_blank";
+      a.rel="noopener";
+    });
+  }
+}
+
+if(params.get("cart")==="1") showCart();
+else showProduct();
+</script>
+</body>
+</html>

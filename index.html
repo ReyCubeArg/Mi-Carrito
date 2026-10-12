@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,6 +10,7 @@ body{font-family:Arial,sans-serif;margin:0;padding:12px;color:#18202b}
 button,a{border:0;border-radius:7px;padding:12px 16px;
 background:#1689b5;color:white;text-decoration:none;
 cursor:pointer;font-size:15px;display:inline-block}
+button:disabled{background:#999;cursor:not-allowed}
 .item{padding:14px 0;border-bottom:1px solid #ddd}
 </style>
 </head>
@@ -22,11 +24,32 @@ const CART_PAGE_URL=location.origin+location.pathname+"?cart=1";
 const INSTAGRAM_URL="https://www.instagram.com/reycubearg/";
 const money=n=>"$"+n.toLocaleString("es-AR");
 
-function getCart(){
- try{return JSON.parse(localStorage.getItem(CART_KEY))||[]}
- catch(e){return []}
+// CONFIGURÁ ACÁ EL STOCK DE CADA PRODUCTO.
+// El nombre debe coincidir con el parámetro name de su URL.
+// Los nombres de ejemplo deben reemplazarse por tus productos reales.
+const STOCK={
+  "moyu rs3m v5":3,
+  "gan 251 m pro":2,
+  "yj yuhu v3 megaminx":1
+};
+
+function normalize(name){
+ return String(name).trim().toLowerCase();
 }
-function saveCart(c){localStorage.setItem(CART_KEY,JSON.stringify(c))}
+function getStock(name){
+ const key=normalize(name);
+ return Object.prototype.hasOwnProperty.call(STOCK,key)
+   ? STOCK[key] : 0;
+}
+function getCart(){
+ try{
+   const c=JSON.parse(localStorage.getItem(CART_KEY));
+   return Array.isArray(c)?c:[];
+ }catch(e){return []}
+}
+function saveCart(c){
+ localStorage.setItem(CART_KEY,JSON.stringify(c));
+}
 function node(tag,text,parent){
  const e=document.createElement(tag);
  e.textContent=text;
@@ -39,61 +62,120 @@ function btn(text,parent,fn){
  b.onclick=fn;
  return b;
 }
+function quantityInCart(name,c=getCart()){
+ return c.reduce((sum,p)=>
+   normalize(p.name)===normalize(name)
+    ? sum+Math.max(0,Number(p.qty)||0)
+    : sum,0);
+}
 
 function productPage(){
  const name=params.get("name")||"Cubo Rey Cube";
-const price = Number(new URLSearchParams(window.location.search).get("price") || 0);
+ const price=Number(params.get("price")||0);
+ const stock=getStock(name);
  app.replaceChildren();
  node("h3",name,app);
+
  if(price>0)node("p",money(price)+" ARS",app);
- btn("＋ Agregar al carrito",app,()=>{
+
+ const remaining=()=>Math.max(0,stock-quantityInCart(name));
+ const info=node("p","",app);
+ const add=btn("＋ Agregar al carrito",app,()=>{});
+
+ function refresh(){
+   const available=remaining();
+   info.textContent=stock===0
+    ?"Stock no configurado para este producto."
+    :available>0
+      ?"Unidades disponibles para agregar: "+available
+      :"Sin unidades disponibles para agregar.";
+   add.disabled=available<=0;
+   add.style.opacity=add.disabled?"0.6":"1";
+ }
+ add.onclick=()=>{
    if(!Number.isFinite(price)||price<=0){
      alert("El precio del producto no es válido.");
      return;
    }
+   if(stock<=0){
+     alert("Este producto no tiene stock configurado.");
+     return;
+   }
+   const c=getCart();
+   if(quantityInCart(name,c)>=stock){
+     alert("No podés agregar más unidades. Stock disponible agotado.");
+     refresh();
+     return;
+   }
+   const item=c.find(x=>normalize(x.name)===normalize(name));
+   if(item){
+     item.qty++;
+   }else{
+     c.push({name,price,qty:1});
+   }
    try{
-     const c=getCart();
-     const item=c.find(x=>x.name===name);
-     if(item){item.qty++}
-     else{c.push({name,price,qty:1})}
      saveCart(c);
      app.replaceChildren();
      node("p","¡Producto agregado al carrito!",app);
      const a=node("a","Ir a Mi carrito",app);
      a.href=CART_PAGE_URL;
+     btn("Seguir comprando",app,()=>location.reload());
    }catch(e){
-     alert("El navegador bloqueó el carrito. Abrí esta página directamente en Chrome.");
+     alert("No se pudo guardar el carrito.");
    }
- });
+ };
+ refresh();
 }
 
 function cartPage(){
  app.replaceChildren();
  node("h2","🛒 Mi carrito",app);
  const c=getCart();
+
  if(!c.length)node("p","Todavía no agregaste productos.",app);
+
  let total=0;
  c.forEach((p,i)=>{
    const row=node("div","",app);
    row.className="item";
    node("b",p.name,row);
    node("p",money(p.price)+" por unidad",row);
+
+   const stock=getStock(p.name);
+   const available=Math.max(0,stock-quantityInCart(p.name,c));
+
+   node("p",stock>0
+     ?"Stock configurado: "+stock+" unidades"
+     :"Stock no configurado: no agregues más unidades.",row);
+
    btn("−",row,()=>{
      p.qty--;
      if(p.qty<=0)c.splice(i,1);
      saveCart(c);cartPage();
    });
+
    node("span"," Cantidad: "+p.qty+" ",row);
-   btn("+",row,()=>{
-     p.qty++;saveCart(c);cartPage();
+
+   const plus=btn("+",row,()=>{
+     if(quantityInCart(p.name,c)>=stock){
+       alert("Alcanzaste el límite de stock de este producto.");
+       return;
+     }
+     p.qty++;
+     saveCart(c);cartPage();
    });
+   plus.disabled=stock<=0||quantityInCart(p.name,c)>=stock;
+
    btn("Eliminar",row,()=>{
      c.splice(i,1);saveCart(c);cartPage();
    });
+
    node("p","Subtotal: "+money(p.price*p.qty),row);
    total+=p.price*p.qty;
  });
+
  node("h3","Total: "+money(total)+" ARS",app);
+
  if(c.length){
    btn("Pedir por Instagram",app,()=>{
      const msg="¡Hola, Rey Cube! Quiero hacer este pedido:\n\n"+
@@ -101,23 +183,38 @@ function cartPage(){
        money(p.price*p.qty)+" ARS").join("\n")+
        "\n\nTotal: "+money(total)+
        " ARS\n¿Me confirman el stock y el envío?";
+
      app.querySelectorAll(".pedido").forEach(x=>x.remove());
-     const box=node("div","",app);box.className="pedido";
+     const box=node("div","",app);
+     box.className="pedido";
      node("p","Copiá este mensaje y pegalo en Instagram:",box);
      const area=node("textarea","",box);
-     area.value=msg;area.rows=8;area.style.width="100%";
+     area.value=msg;
+     area.rows=8;
+     area.style.width="100%";
+
      btn("Copiar pedido",box,async()=>{
-       try{await navigator.clipboard.writeText(msg);alert("¡Pedido copiado!")}
-       catch(e){area.select();alert("Seleccioná y copiá el texto.")}
+       try{
+         await navigator.clipboard.writeText(msg);
+         alert("¡Pedido copiado!");
+       }catch(e){
+         area.select();
+         alert("Seleccioná y copiá el texto.");
+       }
      });
+
      const a=node("a","Abrir Instagram",box);
-     a.href=INSTAGRAM_URL;a.target="_blank";
+     a.href=INSTAGRAM_URL;
+     a.target="_blank";
+     a.rel="noopener";
    });
+
    btn("Vaciar carrito",app,()=>{
      saveCart([]);cartPage();
    });
  }
 }
+
 if(params.get("cart")==="1")cartPage();
 else productPage();
 </script>

@@ -104,14 +104,18 @@ function quantityInCart(name,c=getCart()){
     : sum,0);
 }
 
+
 function productPage(){
-const name=params.get("name")||"Cubo Rey Cube";
-console.log("Nombre recibido:", name);
- const price=Number(params.get("price")||0);
-console.log("STOCK DE PRUEBA:", stock);
- app.replaceChildren();
-node("h3",name,app);
- if(price>0)node("p",money(price)+" ARS",app);
+  const name=params.get("name")||"Cubo Rey Cube";
+  console.log("Nombre recibido:", name);
+  const price=Number(params.get("price")||0);
+  const stock=getStock("moyu v5 uv picube version");
+  console.log("STOCK DE PRUEBA:", stock);
+
+  app.replaceChildren();
+  node("h3",name,app);
+  if(price>0)node("p",money(price)+" ARS",app);
+
 
  const remaining=()=>Math.max(0,stock-quantityInCart(name));
  const info=node("p","",app);

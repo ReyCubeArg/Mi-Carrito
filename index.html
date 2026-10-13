@@ -106,6 +106,7 @@ function quantityInCart(name,c=getCart()){
 
 function productPage(){
  const name=params.get("name")||"Cubo Rey Cube";
+console.log("Nombre recibido:", name);
  const price=Number(params.get("price")||0);
  const stock=getStock(name);
  app.replaceChildren();

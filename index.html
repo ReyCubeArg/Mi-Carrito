@@ -7,32 +7,29 @@
 <title>Rey Cube | Carrito</title>
 <style>
 *{box-sizing:border-box}
-body{font-family:Arial,sans-serif;margin:0;background:#f4f6f8;color:#18202b}
-main{max-width:700px;margin:24px auto;padding:16px}
-.card{background:white;padding:22px;border-radius:14px;box-shadow:0 3px 14px #00000010}
-h1{font-size:25px;margin:0 0 8px}
-h2{font-size:21px}
-p{line-height:1.5}
-button{border:0;border-radius:8px;padding:11px 15px;cursor:pointer;font-size:15px}
-.primary{background:#1689b5;color:white}
-.secondary{background:#e8edf1;color:#18202b}
-.danger{background:#fee2e2;color:#991b1b}
+body{margin:0;background:#f3f5f8;color:#18202b;font-family:Arial,sans-serif}
+main{max-width:680px;margin:25px auto;padding:14px}
+.card{background:#fff;border-radius:14px;padding:22px;box-shadow:0 3px 15px #0001}
+h1{margin-top:0;color:#1689b5}
+h2{overflow-wrap:anywhere}
+button{border:0;border-radius:8px;padding:12px 15px;font-size:15px;cursor:pointer}
 button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:#1689b5;color:white}
+.secondary{background:#e8edf2;color:#18202b}
+.danger{background:#fee2e2;color:#991b1b}
 .item{border-bottom:1px solid #e5e7eb;padding:15px 0}
 .item:last-child{border-bottom:0}
-.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.price,.total{font-weight:bold;font-size:21px}
 .muted{color:#64748b;font-size:14px}
-.price{font-size:21px;font-weight:bold;margin:15px 0}
-.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.total{font-size:23px;font-weight:bold;margin:22px 0}
-a{color:#087ca5}
+.status{padding:10px;background:#eef7fb;border-radius:8px}
 </style>
 </head>
 <body>
 <main>
-<div class="card" id="app">Cargando...</div>
+<div class="card" id="app">Cargando Rey Cube...</div>
 </main>
-
 <script>
 "use strict";
 
@@ -40,12 +37,9 @@ const app=document.getElementById("app");
 const params=new URLSearchParams(location.search);
 const CART_KEY="reycube_cart_v2";
 const INSTAGRAM_URL="https://www.instagram.com/reycubearg/";
-const CART_PAGE_URL=location.origin+location.pathname+"?cart=1";
+const BASE_URL=location.origin+location.pathname;
 
-/* INVENTARIO MANUAL DE REY CUBE
-   Modificá los números según tus existencias.
-   Cada clave es un identificador de stock.
-*/
+/* STOCK MANUAL: actualizá las cantidades cuando vendas o repongas */
 const STOCK={
   "gan-251-m-pro-2x2":2,
   "mgc-beta-core-magnets-uv-2x2":3,
@@ -86,282 +80,189 @@ const STOCK={
   "megaminx-yj-yuhu-v3-maglev-ballcore-ajuste-dual":2
 };
 
-function normalize(value){
-  return String(value||"").trim().toLowerCase();
+function normalize(v){
+  return String(v||"").trim().toLowerCase();
 }
-
-function getStock(stockId){
-  const key=normalize(stockId);
-  return Object.prototype.hasOwnProperty.call(STOCK,key)
-    ? Number(STOCK[key])
-    : 0;
+function money(v){
+  return "$"+Number(v).toLocaleString("es-AR");
 }
-
-function money(value){
-  return "$"+Number(value).toLocaleString("es-AR");
+function el(tag,text,parent){
+  const e=document.createElement(tag);
+  if(text!==undefined)e.textContent=text;
+  parent.appendChild(e);
+  return e;
 }
-
-function node(tag,text,parent){
-  const el=document.createElement(tag);
-  if(text!==undefined)el.textContent=text;
-  parent.appendChild(el);
-  return el;
+function btn(text,parent,fn,cls="secondary"){
+  const b=el("button",text,parent);
+  b.type="button";
+  b.className=cls;
+  b.addEventListener("click",fn);
+  return b;
 }
-
-function button(text,parent,callback,cls="secondary"){
-  const el=node("button",text,parent);
-  el.type="button";
-  el.className=cls;
-  el.addEventListener("click",callback);
-  return el;
+function getStock(id){
+  const k=normalize(id);
+  return Object.prototype.hasOwnProperty.call(STOCK,k)
+    ? Math.max(0,Number(STOCK[k])||0) : null;
 }
-
 function readCart(){
   try{
-    const data=JSON.parse(localStorage.getItem(CART_KEY)||"[]");
-    return Array.isArray(data)?data:[];
-  }catch(error){
-    return [];
-  }
+    const c=JSON.parse(localStorage.getItem(CART_KEY)||"[]");
+    return Array.isArray(c)?c:[];
+  }catch(e){return [];}
 }
-
-function saveCart(cart){
-  localStorage.setItem(CART_KEY,JSON.stringify(cart));
+function saveCart(c){
+  localStorage.setItem(CART_KEY,JSON.stringify(c));
 }
-
-function quantityInCart(stockId){
-  return readCart()
-    .filter(item=>normalize(item.stockId)===normalize(stockId))
-    .reduce((sum,item)=>sum+Number(item.quantity||0),0);
+function cartQuantity(id){
+  return readCart().filter(p=>normalize(p.stockId)===normalize(id))
+    .reduce((n,p)=>n+Number(p.quantity||0),0);
 }
-
+function header(parent){
+  el("h1","Rey Cube",parent);
+  el("p","Tu tienda de cubos de Rubik",parent).className="muted";
+}
 function productPage(){
   const name=params.get("name")||"Cubo Rey Cube";
   const price=Number(params.get("price")||0);
-  const stockId=params.get("stockid")||"";
+  const stockId=params.get("stockid")||name;
   const stock=getStock(stockId);
-
   app.replaceChildren();
+  header(app);
+  el("h2",name,app);
+  if(price>0)el("p",money(price)+" ARS",app).className="price";
+  else el("p","Precio no configurado.",app);
 
-  node("h1","Rey Cube",app);
-  node("p","Tu tienda de cubos de Rubik",app);
-  node("h2",name,app);
+  const status=el("p","",app);
+  status.className="status";
 
-  if(price>0){
-    node("p",money(price)+" ARS",app).className="price";
-  }else{
-    node("p","Precio no configurado.",app);
+  function update(){
+    const remaining=stock===null?0:Math.max(0,stock-cartQuantity(stockId));
+    if(stock===null)status.textContent="Stock no configurado para este producto.";
+    else if(remaining>0)status.textContent="Unidades disponibles para agregar: "+remaining;
+    else status.textContent="Sin unidades disponibles para agregar.";
+    add.disabled=stock===null||remaining<=0||price<=0;
   }
 
-  const info=node("p","",app);
-  const add=button("Agregar al carrito",app,addToCart,"primary");
-  const goCart=button("Ver carrito",app,()=>{
-    location.href=CART_PAGE_URL;
-  });
-
-  function remaining(){
-    return Math.max(0,stock-quantityInCart(stockId));
-  }
-
-  function refresh(){
-    const available=remaining();
-
-    if(!stockId||!Object.prototype.hasOwnProperty.call(STOCK,normalize(stockId))){
-      info.textContent="Stock no configurado para este producto.";
-    }else if(available>0){
-      info.textContent="Unidades disponibles para agregar: "+available;
-    }else{
-      info.textContent="Sin unidades disponibles para agregar.";
-    }
-
-    add.disabled=available<=0||price<=0||!stockId;
-  }
-
-  function addToCart(){
-    if(!stockId||!Object.prototype.hasOwnProperty.call(STOCK,normalize(stockId))){
-      alert("Este producto no tiene stock configurado.");
+  const add=btn("Agregar al carrito",app,()=>{
+    if(stock===null){
+      status.textContent="Stock no configurado. Revisá el stockid del enlace.";
       return;
     }
-
-    if(price<=0){
-      alert("Este producto no tiene un precio válido.");
-      return;
-    }
-
-    if(remaining()<=0){
-      alert("No hay más unidades disponibles.");
-      refresh();
-      return;
-    }
+    if(price<=0){status.textContent="El precio no es válido.";return;}
+    if(cartQuantity(stockId)>=stock){update();return;}
 
     const cart=readCart();
-    const existing=cart.find(item=>
-      normalize(item.stockId)===normalize(stockId)
-    );
-
-    if(existing){
-      existing.quantity=Number(existing.quantity||0)+1;
-      existing.name=name;
-      existing.price=price;
+    const found=cart.find(p=>normalize(p.stockId)===normalize(stockId));
+    if(found){
+      found.quantity=Number(found.quantity||0)+1;
+      found.name=name;
+      found.price=price;
     }else{
-      cart.push({
-        stockId:stockId,
-        name:name,
-        price:price,
-        quantity:1
-      });
+      cart.push({stockId,name,price,quantity:1});
     }
-
     saveCart(cart);
-    refresh();
-    alert("Producto agregado al carrito.");
-  }
-
-  refresh();
-}
-
-function cartPage(){
-  app.replaceChildren();
-
-  node("h1","Rey Cube",app);
-  node("h2","Tu carrito",app);
-
-  const content=node("div",undefined,app);
-  const totalEl=node("p","",app);
-  totalEl.className="total";
-
-  function render(){
-    content.replaceChildren();
-    const cart=readCart();
-
-    if(cart.length===0){
-      node("p","Tu carrito está vacío.",content);
-      totalEl.textContent="Total: $0";
-      return;
-    }
-
-    let total=0;
-
-    cart.forEach(item=>{
-      const price=Number(item.price)||0;
-      const quantity=Number(item.quantity)||0;
-      const stock=getStock(item.stockId);
-      total+=price*quantity;
-
-      const row=node("div",undefined,content);
-      row.className="item";
-
-      const title=node("h3",item.name,row);
-      title.style.margin="0 0 8px";
-
-      node("p",money(price)+" c/u",row);
-
-      const controls=node("div",undefined,row);
-      controls.className="row";
-
-      const qty=node("div",undefined,controls);
-      qty.className="actions";
-
-      button("−",qty,()=>{
-        const latest=readCart();
-        const found=latest.find(p=>
-          normalize(p.stockId)===normalize(item.stockId)
-        );
-        if(found){
-          found.quantity--;
-          if(found.quantity<=0){
-            saveCart(latest.filter(p=>
-              normalize(p.stockId)!==normalize(item.stockId)
-            ));
-          }else{
-            saveCart(latest);
-          }
-        }
-        render();
-      });
-
-      node("span","Cantidad: "+quantity,qty);
-
-      button("+",qty,()=>{
-        const latest=readCart();
-        const found=latest.find(p=>
-          normalize(p.stockId)===normalize(item.stockId)
-        );
-
-        if(!found)return;
-
-        const otherQuantity=latest
-          .filter(p=>normalize(p.stockId)===normalize(item.stockId))
-          .reduce((sum,p)=>sum+Number(p.quantity||0),0);
-
-        if(otherQuantity>=stock){
-          alert("No podés agregar más unidades: alcanzaste el stock disponible.");
-          return;
-        }
-
-        found.quantity++;
-        saveCart(latest);
-        render();
-      }, "primary");
-
-      button("Eliminar",controls,()=>{
-        saveCart(readCart().filter(p=>
-          normalize(p.stockId)!==normalize(item.stockId)
-        ));
-        render();
-      },"danger");
-
-      node("p","Subtotal: "+money(price*quantity),row);
-    });
-
-    totalEl.textContent="Total: "+money(total)+" ARS";
-  }
-
-  button("Seguir comprando",app,()=>{
-    location.href=location.origin+location.pathname;
-  });
-
- 
-button("Vaciar carrito",app,()=>{
-  saveCart([]);
-  render();
-  alert("Carrito vaciado correctamente.");
-},"danger");
-
-  },"danger");
-
-  button("Pedir por Instagram",app,()=>{
-    const cart=readCart();
-    if(cart.length===0){
-      alert("Tu carrito está vacío.");
-      return;
-    }
-
-    const summary=cart.map(item=>
-      item.name+" x"+item.quantity+" - "+money(item.price*item.quantity)
-    ).join("\n");
-
-    const text="Hola Rey Cube, quiero hacer este pedido:\n"+
-      summary+"\nTotal: "+totalEl.textContent.replace("Total: ","");
-
-    try{
-      if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(text);
-      }
-    }catch(error){}
-
-    alert("Si el resumen se copió, podés pegarlo en el chat de Instagram.");
-    window.open(INSTAGRAM_URL,"_blank","noopener");
+    update();
+    status.textContent="¡Producto agregado al carrito!";
   },"primary");
 
+  btn("Ver carrito",app,()=>{location.href=BASE_URL+"?cart=1";});
+  update();
+}
+function cartPage(){
+  app.replaceChildren();
+  header(app);
+  el("h2","Tu carrito",app);
+  const list=el("div",undefined,app);
+  const totalText=el("p","",app);
+  totalText.className="total";
+  const status=el("p","",app);
+  status.className="status";
+  status.hidden=true;
+
+  function render(){
+    list.replaceChildren();
+    const cart=readCart();
+    if(cart.length===0){
+      el("p","Tu carrito está vacío.",list);
+      totalText.textContent="Total: $0";
+      return;
+    }
+    let total=0;
+    cart.forEach(item=>{
+      const quantity=Number(item.quantity)||0;
+      const price=Number(item.price)||0;
+      const stock=getStock(item.stockId);
+      total+=quantity*price;
+      const box=el("div",undefined,list);
+      box.className="item";
+      el("h3",item.name,box);
+      el("p",money(price)+" por unidad",box);
+      const row=el("div",undefined,box);
+      row.className="row";
+      const controls=el("div",undefined,row);
+      controls.className="buttons";
+      btn("−",controls,()=>{
+        const c=readCart();
+        const p=c.find(x=>normalize(x.stockId)===normalize(item.stockId));
+        if(p)p.quantity--;
+        saveCart(c.filter(x=>Number(x.quantity)>0));
+        render();
+      });
+      el("span","Cantidad: "+quantity,controls);
+      btn("+",controls,()=>{
+        const c=readCart();
+        const p=c.find(x=>normalize(x.stockId)===normalize(item.stockId));
+        if(!p)return;
+        const current=cartQuantity(item.stockId);
+        if(stock===null||current>=stock){
+          status.hidden=false;
+          status.textContent=stock===null
+            ?"Stock no configurado para "+item.name+"."
+            :"No hay más unidades disponibles de "+item.name+".";
+          return;
+        }
+        p.quantity++;
+        saveCart(c);
+        status.hidden=true;
+        render();
+      },"primary");
+      btn("Eliminar",controls,()=>{
+        saveCart(readCart().filter(x=>normalize(x.stockId)!==normalize(item.stockId)));
+        render();
+      },"danger");
+      el("p","Subtotal: "+money(quantity*price),box);
+    });
+    totalText.textContent="Total: "+money(total)+" ARS";
+  }
+
+  const actions=el("div",undefined,app);
+  actions.className="buttons";
+  btn("Seguir comprando",actions,()=>{location.href=BASE_URL;});
+  btn("Vaciar carrito",actions,()=>{
+    saveCart([]);
+    render();
+    status.hidden=false;
+    status.textContent="Carrito vaciado correctamente.";
+  },"danger");
+  btn("Pedir por Instagram",actions,()=>{
+    const cart=readCart();
+    if(!cart.length){
+      status.hidden=false;
+      status.textContent="Tu carrito está vacío.";
+      return;
+    }
+    const lines=cart.map(p=>p.name+" x"+p.quantity+" — "+money(p.price*p.quantity));
+    const total=cart.reduce((n,p)=>n+Number(p.price)*Number(p.quantity),0);
+    const message="Hola Rey Cube, quiero hacer este pedido:\n"+
+      lines.join("\n")+"\nTotal: "+money(total)+" ARS";
+    status.hidden=false;
+    status.textContent="Se abrirá Instagram. Copiá y enviá este resumen:\n"+message;
+    window.open(INSTAGRAM_URL,"_blank","noopener");
+  },"primary");
   render();
 }
-
-if(params.get("cart")==="1"){
-  cartPage();
-}else{
-  productPage();
-}
+if(params.get("cart")==="1")cartPage();
+else productPage();
 </script>
 </body>
 </html>

@@ -175,8 +175,7 @@ function cartPage(){
    row.className="item";
    node("b",p.name,row);
    node("p",money(p.price)+" por unidad",row);
-
-   const stock=getStock(p.name);
+const stock=getStock(params.get("stockid")||name);
    const available=Math.max(0,stock-quantityInCart(p.name,c));
 
    node("p",stock>0

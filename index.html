@@ -108,7 +108,7 @@ function productPage(){
 const name=params.get("name")||"Cubo Rey Cube";
 console.log("Nombre recibido:", name);
  const price=Number(params.get("price")||0);
- const stock=getStock(name);
+ const stock=getStock("moyu v5 uv picube version");
  app.replaceChildren();
 node("h3",name,app);
  if(price>0)node("p",money(price)+" ARS",app);

@@ -321,11 +321,13 @@ function cartPage(){
     location.href=location.origin+location.pathname;
   });
 
-  button("Vaciar carrito",app,()=>{
-    if(confirm("¿Querés vaciar el carrito?")){
-      saveCart([]);
-      render();
-    }
+ 
+button("Vaciar carrito",app,()=>{
+  saveCart([]);
+  render();
+  alert("Carrito vaciado correctamente.");
+},"danger");
+
   },"danger");
 
   button("Pedir por Instagram",app,()=>{
